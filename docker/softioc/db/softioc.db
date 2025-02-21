@@ -1,9 +1,9 @@
 # SELAP == 64, GDR == 4
-record(ai,"R1M1CNTL2MODE") {
+record(ai,"R$(A)CNTL2MODE") {
     field(VAL, 64)
 }
 # RF on == 1, RF off == 0
-record(ai, "R1M1RFONr") {
+record(ai, "R$(A)RFONr") {
     field(VAL, 1)
 }
 # Bit word where gradient is ramping if `int(value) & 0x0800 > 0`
