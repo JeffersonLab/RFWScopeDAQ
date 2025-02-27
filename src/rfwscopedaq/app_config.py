@@ -11,8 +11,11 @@ logger = logging.getLogger(__name__)
 
 # The root directory of the app.  Commented out version is root if not in csue
 # app_root = os.path.realpath(os.path.join(os.path.basename(__file__), ".."))
-app_root = os.path.realpath(os.path.join(os.path.dirname(__file__),
-                                         "..", "..", "..", ".."))
+# app_root = os.path.realpath(os.path.join(os.path.dirname(__file__),
+#                                          "..", "..", "..", ".."))
+# Launcher scripts should set this.
+app_root = os.environ.get('APP_ROOT')
+
 # CSUE variables - challenging to use these if not using CSUE templates.
 # Instead, use a relative path to identify the root directory for this version.
 csue_app_path = app_root
