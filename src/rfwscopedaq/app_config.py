@@ -2,7 +2,7 @@ import yaml
 import threading
 import os
 import logging
-from typing import Any, List, Union, Dict
+from typing import Any, List, Union
 
 from functools import reduce
 import operator
@@ -47,20 +47,7 @@ def parse_config_file(filename: str = f"{app_root}/cfg.yaml"):
         try:
             with open(filename, mode="r") as f:
                 _CONFIG = yaml.safe_load(f)
-                # # This will choke if a line has a comment after some content.  Comments MUST be on their own line.
-                # lines = []
-                #
-                # # Process each line, skip empty ones or comments.
-                # for line in f:
-                #     line = line.strip()
-                #     if len(line) == 0:
-                #         continue
-                #     if line.startswith('#'):
-                #         continue
-                #     lines.append(line)
-                #
-                # # Put all the lines together with newlines for easy debug readability
-                # data = '\n'.join(lines)
+
         except yaml.YAMLError as exc:
             # Print out the portion of config file near the error.
             if hasattr(exc, 'problem_mark'):
@@ -74,21 +61,6 @@ def parse_config_file(filename: str = f"{app_root}/cfg.yaml"):
         except Exception as exc:
             logger.error(f"Error reading file '{filename}': {exc}")
             raise exc
-
-        # try:
-        #     _CONFIG = yaml.safe_load(data)
-        # except yaml.YAMLError as exc:
-        #     # Print out the portion of config file near the error.
-        #     if hasattr(exc, 'problem_mark'):
-        #         line = exc.problem_mark.line + 1
-        #         column = exc.problem_mark.column
-        #         logger.error(f"Error parsing config near {line}:{column} ... {exc.problem_mark.get_snippet()} ...")
-        #     else:
-        #         logger.error(f"Error parsing config: {exc}")
-        #     raise
-        # except Exception as exc:
-        #     logger.error(f"Error parsing _CONFIG file '{filename}': {exc}")
-        #     raise
 
 
 def clear_config():
@@ -174,7 +146,7 @@ def validate_config():
             # Check that all of these are floats / numbers
             if not isinstance(_CONFIG[key], typ):
                 logger.error(f"Required config parameter '{key}' is not required type '{typ}'."
-                                 f"  Received '{_CONFIG[key]}' of type '{type(_CONFIG[key])}'")
+                             f"  Received '{_CONFIG[key]}' of type '{type(_CONFIG[key])}'")
                 logger.error(f"_CONFIG = {_CONFIG}")
                 raise ValueError(f"Required config parameter '{key}' is not required type '{typ}'."
                                  f"  Received '{_CONFIG[key]}' of type '{type(_CONFIG[key])}'")
