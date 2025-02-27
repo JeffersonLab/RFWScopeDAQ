@@ -131,8 +131,9 @@ class Cavity:
         self.data_ready_lock = threading.Lock()
         self.data_ready = False
 
-        # Need to test for timeout of the scope sequencer
-        # self.sequencer_timeout = False        
+        # Need to monitor beam current.  User may specify a minimum beam current for data collection.
+        self.beam_current = epics.PV("R2XXITOT")
+        self.pvs.append(self.beam_current)
 
         # These will be float type timestamps indicating the acceptable start and end times of the waveforms for them
         # to be a valid set.  Access should be synchronized using data_ready_lock.
@@ -192,13 +193,18 @@ class Cavity:
         valid = value == 4 or value == 64
         return valid
 
-    def is_stable_running(self):
+    def is_beam_current_sufficient(self):
+        """Check that we have enough beam current present in the machine for data to be valid."""
+        beam_current = self.__get_pv(self.beam_current)
+        return beam_current > cfg.get_parameter("min_beam_current")
+
+    def is_state_valid(self):
         not_ramping = not self.is_gradient_ramping()
         rf_on = self.is_rf_on()
         valid_mode = self.is_valid_control_mode()
+        sufficient_beam = self.is_beam_current_sufficient()
 
-        is_stable = all((not_ramping, rf_on, valid_mode))
-        return is_stable
+        return all((not_ramping, rf_on, valid_mode, sufficient_beam))
 
     def get_waveforms(self, timeout=60, sleep_dur=0.01) -> Tuple[Dict[str, np.ndarray], datetime, datetime]:
         """Waits for the FCC to have reported data is ready, then grabs those waveforms.  Checks for valid timestamps"""

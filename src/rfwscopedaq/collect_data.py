@@ -82,23 +82,24 @@ class DaqThread(threading.Thread):
 					if time_ms_stamp is None:
 						raise RuntimeError(f"Error setting time_ms_stamp for: '{self.epics_name}")
 					while current_time < stop_time:
-						self.n_attempts += 1
 						if self.exit_event.is_set():
 							print(f"{self.epics_name}: Exiting early")
 							break
 
-						error = ""
 						try:
 							# Recheck the scope is in the desired mode before every download.  Useful for long runs.
 							self.cavity.setup_scope()
 
-							# Wait until there is no trip.  After timeout seconds, drop the sample, and retry if time allows
+							# Wait until CEBAF and cavity is in a stable state.  Break if time
 							start = datetime.now()
-							while not self.cavity.is_stable_running():
-								time.sleep(1)
+							while not self.cavity.is_state_valid():
+								time.sleep(0.05)
 								if (datetime.now() - start).total_seconds() > self.timeout:
 									raise RuntimeError(f"{self.epics_name}: {start.strftime('%Y-%m-%d %H:%M:%S')} "
 													   "sample timed out waiting for stable running")
+
+							# Here goes the actual data collection
+							self.n_attempts += 1
 
 							# Get the waveform data and the closest estimate for the waveforms' location in absolute time.
 							results_dict, start, end = self.cavity.get_waveforms()
