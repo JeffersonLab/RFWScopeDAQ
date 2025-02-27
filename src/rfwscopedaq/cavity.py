@@ -8,11 +8,16 @@ from typing import Any, Dict, Tuple
 import epics
 import numpy as np
 
+from . import app_config as cfg
 
 class Cavity:
 
-    def _data_ready_cb(self, pvname=None, value=None, char_value=None, timestamp=None, **kwargs):
-        """This callback should only be used to monitor the R...STAT2b.B3 PV to see when the FCC has updated data."""
+    def _data_ready_cb(self, value=None, timestamp=None, **kwargs):
+        """This callback should only be used to monitor the R...STAT2b.B3 PV to see when the FCC has updated data.
+
+        Arguments are values available to all EPICS callbacks.  Value is the value of the PV, timestamp is the time
+        the PV was processed.
+        """
 
         with self.data_ready_lock:
             # Start of data taking phase for the FPGA and other pauses
@@ -243,8 +248,8 @@ class Cavity:
 
                     break
 
-            # Sleep for a little bit before we check again if data is ready.
-            time.sleep(sleep_dur)
+            # Sleep for a little bit before we check again if data is ready.  pend_event more precides than time.sleep
+            epics.ca.pend_event(sleep_dur)
             count += 1
             if count * sleep_dur > timeout:
                 raise RuntimeError(f"{self.epics_name}: Timed out waiting for good data. (> {timeout}s)")
@@ -280,6 +285,9 @@ class Cavity:
             timeout: Seconds to wait before raising an exception
             delta: How long to sleep between checks of PV value
         """
+
+        # Since I'm waiting for a PV to reach a certain value, and not necessarily from a put/get call, I use the
+        # time.sleep method.
         start = datetime.now()
         if isinstance(value, float):
             while not math.isclose(pv.get(), value):
