@@ -1,4 +1,4 @@
-import json
+import yaml
 import threading
 import os
 import logging
@@ -36,7 +36,7 @@ def _set_in_dict(d: dict, key_list: list, value: Any):
     _get_from_dict(d, key_list[:-1])[key_list[-1]] = value
 
 
-def parse_config_file(filename: str = f"{app_root}/cfg.json"):
+def parse_config_file(filename: str = f"{app_root}/cfg.yaml"):
     """Process an application level configuration file
 
     Args:
@@ -46,35 +46,49 @@ def parse_config_file(filename: str = f"{app_root}/cfg.json"):
     with _CONFIG_LOCK:
         try:
             with open(filename, mode="r") as f:
-                # This will choke if a line has a comment after some content.  Comments MUST be on their own line.
-                lines = []
-
-                # Process each line, skip empty ones or comments.
-                for line in f:
-                    line = line.strip()
-                    if len(line) == 0:
-                        continue
-                    if line.startswith('#'):
-                        continue
-                    lines.append(line)
-
-                # Put all of the lines together with newlines for easy debug readability
-                jsondata = '\n'.join(lines)
+                _CONFIG = yaml.safe_load(f)
+                # # This will choke if a line has a comment after some content.  Comments MUST be on their own line.
+                # lines = []
+                #
+                # # Process each line, skip empty ones or comments.
+                # for line in f:
+                #     line = line.strip()
+                #     if len(line) == 0:
+                #         continue
+                #     if line.startswith('#'):
+                #         continue
+                #     lines.append(line)
+                #
+                # # Put all the lines together with newlines for easy debug readability
+                # data = '\n'.join(lines)
+        except yaml.YAMLError as exc:
+            # Print out the portion of config file near the error.
+            if hasattr(exc, 'problem_mark'):
+                line = exc.problem_mark.line + 1
+                column = exc.problem_mark.column
+                logger.error(f"Error parsing {filename} near line {line} column {column}")
+            else:
+                logger.error(f"Error parsing config: {exc}")
+            raise
 
         except Exception as exc:
             logger.error(f"Error reading file '{filename}': {exc}")
             raise exc
 
-        try:
-            _CONFIG = json.loads(jsondata)
-        except json.decoder.JSONDecodeError as exc:
-            # Print out the portion of config file near the error.
-            start, stop = max(0, exc.pos - 50), min(len(exc.doc), exc.pos + 50)
-            logger.error(f"Error parsing config: ... {exc.doc[start:stop]} ...")
-            raise exc
-        except Exception as exc:
-            logger.error(f"Error parsing _CONFIG file '{filename}': {exc}")
-            raise exc
+        # try:
+        #     _CONFIG = yaml.safe_load(data)
+        # except yaml.YAMLError as exc:
+        #     # Print out the portion of config file near the error.
+        #     if hasattr(exc, 'problem_mark'):
+        #         line = exc.problem_mark.line + 1
+        #         column = exc.problem_mark.column
+        #         logger.error(f"Error parsing config near {line}:{column} ... {exc.problem_mark.get_snippet()} ...")
+        #     else:
+        #         logger.error(f"Error parsing config: {exc}")
+        #     raise
+        # except Exception as exc:
+        #     logger.error(f"Error parsing _CONFIG file '{filename}': {exc}")
+        #     raise
 
 
 def clear_config():
@@ -141,8 +155,15 @@ def validate_config():
     """Make sure that a handful of required _CONFIG settings are present and of correct type."""
     global _CONFIG, _CONFIG_LOCK
     required = [
-        ('timeout', float), ('channels', List[str]), ('meta_pvs', List[str]), ('base_dir', str),
-        ('email', dict), ('timeout', float), ('failure_threshold', float), ('db_config', Dict[str, Any]),
+        ('timeout', float),
+        ('signals', list),
+        ('meta_pvs', list),
+        ('base_dir', str),
+        ('email', dict),
+        ('timeout', float),
+        ('failure_threshold', float),
+        ('db_config', dict),
+        ('min_beam_current', float)
     ]
 
     with _CONFIG_LOCK:
@@ -152,5 +173,8 @@ def validate_config():
                 raise ValueError(f"Configuration is missing '{key}")
             # Check that all of these are floats / numbers
             if not isinstance(_CONFIG[key], typ):
+                logger.error(f"Required config parameter '{key}' is not required type '{typ}'."
+                                 f"  Received '{_CONFIG[key]}' of type '{type(_CONFIG[key])}'")
+                logger.error(f"_CONFIG = {_CONFIG}")
                 raise ValueError(f"Required config parameter '{key}' is not required type '{typ}'."
                                  f"  Received '{_CONFIG[key]}' of type '{type(_CONFIG[key])}'")
