@@ -3,14 +3,13 @@
 # Exception: you may change "tclsh" to "wish" or "expect"
 import signal
 import threading
-import traceback
 from pathlib import Path
 import argparse
 from datetime import datetime
 import re
 from typing import List
 
-from mysql.connector.conversion import MySQLConverterBase, MySQLConverter
+from mysql.connector.conversion import MySQLConverter
 from mysql.connector.pooling import MySQLConnectionPool
 import epics
 
@@ -52,14 +51,20 @@ class NumpyConverterClass(MySQLConverter):
         return int(value)
 
 
-def handler(signum, frame):
+def handler(*args, **kwargs):
     """Signal handler that notifies any threads watching the EXIT_EVENT that it's time to exit."""
     global EXIT_EVENT
     EXIT_EVENT.set()
 
 
-def process_cavities(cavities, duration, out_dir, signals, timeout, output: str):
-    """Collect data from the specified cavities."""
+def process_cavities(cavities, out_dir, output: str):
+    """Collect data from the specified cavities.
+
+    Args:
+        cavities: List of cavities to collect data from
+        out_dir: Directory to write output to if file output requested
+        output: Where to store data
+    """
 
     # Initialize EPICS context that will be used by worker threads
     epics.ca.create_context()
@@ -67,6 +72,7 @@ def process_cavities(cavities, duration, out_dir, signals, timeout, output: str)
     # Define handlers for common 'exit now' signals
     signal.signal(signal.SIGINT, handler)
     signal.signal(signal.SIGTERM, handler)
+
 
     # Use a pool with a small number of connections.  First because the pool handles thready safety where a single
     # connection does not.  Second, becuase if we used a larger pool size and launched this script once per zone, then
@@ -79,8 +85,9 @@ def process_cavities(cavities, duration, out_dir, signals, timeout, output: str)
 
     threads = []
     for cavity in cavities:
-        threads.append(DaqThread(exit_event=EXIT_EVENT, epics_name=cavity, duration=duration, out_dir=out_dir,
-                                 signals=signals, timeout=timeout, db_pool=pool, output=output,
+        threads.append(DaqThread(exit_event=EXIT_EVENT, epics_name=cavity, duration=cfg.get_parameter('duration'),
+                                 out_dir=out_dir, signals=cfg.get_parameter('signals'),
+                                 timeout=cfg.get_parameter('timeout'), db_pool=pool, output=output,
                                  meta_pvs=cfg.get_parameter('meta_pvs')))
 
     # Kick off the threads
@@ -91,9 +98,9 @@ def process_cavities(cavities, duration, out_dir, signals, timeout, output: str)
     for thread in threads:
         # Python join is a blocking operation even for signals.  Solution is to set a timeout in a loop, and keep
         # joining as long as the thread is still alive.  This gives the signals a chance to be handled once every
-        # second. Maybe it's better to check is_alive() with a sleep.
+        # second. Alternative would be to check is_alive() with a sleep.
         while thread.is_alive():
-            thread.join(timeout=1)
+            thread.join(timeout=0.1)
 
     send_failure_report(threads=threads)
 
@@ -136,7 +143,11 @@ def send_failure_report(threads: List[DaqThread]):
 
 
 def validate_cavity(cavity: str):
-    """Check if the cavity name is valid.  Raise exception if not."""
+    """Check if the cavity name is valid.  Raise exception if not.
+
+    Args:
+        cavity: Cavity name to validate
+    """
 
     valid_linacs = "012"
     valid_zones = "23456789ABCDEFGHIJKLMNOPQ"
@@ -160,7 +171,11 @@ def validate_cavity(cavity: str):
 
 
 def validate_zone(zone: str):
-    """Check if the zone name is valid.  Raise exception if not."""
+    """Check if the zone name is valid.  Raise exception if not.
+
+    Args:
+        zone: Zone name to validate
+    """
 
     valid_linacs = "012"
     valid_zones = "23456789ABCDEFGHIJKLMNOPQ"
@@ -179,9 +194,6 @@ def validate_zone(zone: str):
 
 def main():
     try:
-        # Grab start_time
-        start_time = datetime.now().strftime("%Y-%m-%d_%H%M%S_%f")
-
         # Setup parser.  You can target either a cavity or a zone.  Secondary check is
         # required to make sure that the user hasn't blocked all output of results.
         parser = argparse.ArgumentParser(prog=f"waveform_cavity",
@@ -205,7 +217,7 @@ def main():
         parser.add_argument("-E", "--no-email", action='store_true',
                             help="Suppress generation of the email report")
         parser.add_argument("-f", "--file", type=str,
-                             help="Configuration file")
+                            default=f"{Path(csue_cfg_dir).joinpath('config.yaml')}", help="Configuration file")
         parser.add_argument("-v", "--version", action='version', version='%(prog)s ' + __version__)
 
         args = parser.parse_args()
@@ -213,30 +225,25 @@ def main():
         # Default value is set in app_config
         cfg.parse_config_file(args.file)
 
+        # Update configuration
         if args.duration:
             cfg.set_parameter("duration", args.duration)
-        duration = cfg.get_parameter("duration")
-
         if args.email is not None:
             cfg.set_parameter(["email", "to_addrs"], args.email)
-
         if args.no_email:
             cfg.set_parameter("email", None)
-
         if args.dir:
-            basedir = Path(args.dir)
-            cfg.set_parameter('basedir', basedir)
-        else:
-            basedir = Path(cfg.get_parameter("basedir"))
+            cfg.set_parameter('base_dir', args.dir)
 
+        base_dir = Path(cfg.get_parameter("base_dir"))
         app_start = datetime.now().strftime("%Y_%m_%d")
         cavities = []
         if args.cavity is not None:
-            out_dir = basedir.joinpath(app_start, args.cavity[:-1])
+            out_dir = base_dir.joinpath(app_start, args.cavity[:-1])
             cavities.append(args.cavity)
         elif args.zone is not None:
             validate_zone(args.zone)
-            out_dir = basedir.joinpath(app_start, args.zone)
+            out_dir = base_dir.joinpath(app_start, args.zone)
             for i in range(1, 9):
                 cavities.append(f"{args.zone}{i}")
         else:
@@ -245,15 +252,11 @@ def main():
         for cavity in cavities:
             validate_cavity(cavity)
 
-        # for cavity in cavities:
-        #     out_dir.joinpath(cavity).mkdir(parents=True, exist_ok=True)
-
-        signals = cfg.get_parameter("channels")
+        # Make sure that we have all the configuration we need fully setup
+        cfg.validate_config()
 
         # Go get the data and analyze it
-        process_cavities(cavities=cavities, duration=duration, out_dir=out_dir, signals=signals,
-                         timeout=cfg.get_parameter("timeout"), output=args.output)
+        process_cavities(cavities=cavities, out_dir=out_dir, output=args.output)
 
     except Exception as e:
         print("Error:", e)
-        traceback.print_exc()
