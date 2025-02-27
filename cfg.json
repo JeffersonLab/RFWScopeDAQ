@@ -1,0 +1,48 @@
+{
+  # Configuration for write access to the scope_waveforms database
+  "db_config": {
+    "host": "localhost",
+    "user": "scope_rw",
+    "password": "password",
+    "port": "3306",
+    "database": "scope_waveforms"
+  },
+  # Waveforms to be collected.  Full PV is {epics_name}{channel}'
+  "channels": [
+    "WFSIMES",
+    "WFSQMES",
+    "WFSGMES",
+    "WFSPMES",
+    "WFSGASK",
+    "WFSPASK",
+    "WFSCRFP",
+    "WFSCRFPP",
+    "WFSCRRP",
+    "WFSCRRPP",
+    "WFSGLDE",
+    "WFSPLDE",
+    "WFSDETA2",
+    "WFSCFQE2",
+    "WFSDFQES"
+  ],
+  # PVs which will be queried at the time of data collection
+  "meta_pvs": [
+    "R2XXITOT",
+    "IGL1I00BEAMODE"
+  ],
+  # Root directory where data directory tree will be written.
+  "basedir": "/tmp/c100-rfw-scope-data/",
+  # Email addresses for failure reports
+  "email": {
+#    "to_addrs": ["adamc@jlab.org","tennant@jlab.org"],
+    "to_addrs": ["adamc@jlab.org"],
+    "from_addr": ["rfwscopedaq@jlab.org"]
+  },
+  # How long in minutes to collect data for
+  "duration": 5.0,
+  # How long to wait for stable operations before breaking and retrying.  During this operaiton the thread is blocked
+  # and will not check for exit status.
+  "timeout": 1.0,
+  # Max percentage of collections that can encouter exceptional failures without generating a report email.
+  "failure_threshold": 0.0
+}
