@@ -9,14 +9,14 @@ record(ai, "R$(A)RFONr") {
 # Bit word where gradient is ramping if `int(value) & 0x0800 > 0`
 # 0x0800 == 2048
 record(ai, "R$(A)STAT1") {
-    field(VAL, 2048)
+    field(VAL, 0)
 }
 # 0 == stopped, 1 == single, 2 == run, 3 == periodic
 record(ai, "R$(A)WFSCOPrun") {
     field(VAL, 3)
 }
 # Typical periodic delay is 1, don't change to less than 0.1
-record(ai, "R$(A)WFSCOPer") {
+record(ai, "R$(A)WFSCOPper") {
     field(VAL, 1)
 }
 # Sample interval within waveform data
@@ -24,7 +24,7 @@ record(ai, "R$(A)TRGS1") {
     field(VAL, 0.2)
 }
 # Trigger delay, probably not used here(?).  Set to 102.4 in harvester mode.
-record(ai, "R$(A)TRGS1") {
+record(ai, "R$(A)TRGD1") {
     field(VAL, 100)
 }
 # normal == 0, debug == 1
@@ -106,4 +106,67 @@ record(waveform, "R$(A)WFSDFQES") {
     field(FTVL, "FLOAT")
 }
 
-
+# Metadata PVs
+record(ai, "R2XXITOT") {
+  field(VAL, 45.2)
+}
+record(mbbo, "IGL1I00BEAMODE") {
+  field(DTYP, "Soft Channel")
+  field(DOL, "0")
+  field(FLNK, "0")
+  field(OUT, "0")
+  field(SDIS, "0")
+  field(COSV, "NO_ALARM")
+  field(DESC, "multibit binary output rec")
+  field(DISS, "NO_ALARM")
+  field(EISV, "NO_ALARM")
+  field(EIVL, "0")
+  field(ELSV, "NO_ALARM")
+  field(ELVL, "0")
+  field(EVNT, "0")
+  field(FFSV, "NO_ALARM")
+  field(FFVL, "0")
+  field(FRST, "USER MODE")
+  field(FRSV, "NO_ALARM")
+  field(FRVL, "4")
+  field(FTSV, "NO_ALARM")
+  field(FTVL, "0")
+  field(FVSV, "NO_ALARM")
+  field(FVVL, "0")
+  field(IVOA, "Continue normally")
+  field(IVOV, "0")
+  field(NISV, "NO_ALARM")
+  field(NIVL, "0")
+  field(NOBT, "4")
+  field(OMSL, "supervisory")
+  field(ONST, "PULSE MODE VL")
+  field(ONSV, "NO_ALARM")
+  field(ONVL, "1")
+  field(PHAS, "0")
+  field(PINI, "YES")
+  field(PRIO, "LOW")
+  field(SCAN, "Passive")
+  field(SIML, "0")
+  field(SIMS, "NO_ALARM")
+  field(SIOL, "0")
+  field(SVSV, "NO_ALARM")
+  field(SVVL, "0")
+  field(SXSV, "NO_ALARM")
+  field(SXVL, "0")
+  field(TESV, "NO_ALARM")
+  field(TEVL, "0")
+  field(THST, "CW MODE (DC)")
+  field(THSV, "NO_ALARM")
+  field(THVL, "3")
+  field(TTSV, "NO_ALARM")
+  field(TTVL, "0")
+  field(TVSV, "NO_ALARM")
+  field(TVVL, "0")
+  field(TWST, "TUNE MODE")
+  field(TWSV, "NO_ALARM")
+  field(TWVL, "2")
+  field(UNSV, "NO_ALARM")
+  field(ZRST, "BEAM SYNC ONLY")
+  field(ZRSV, "NO_ALARM")
+  field(ZRVL, "0")
+}
