@@ -127,6 +127,9 @@ def send_failure_report(threads: List[DaqThread]):
         msg = f"Failure report for run ending at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         for thread in threads:
             msg += f"{thread.epics_name}: {thread.n_success} / {thread.n_attempts} attempts succeeded\n"
+            for error in thread.errors:
+                msg += f"  {error}\n"
+            msg += "\n"
 
         mailer.send_txt_email(msg)
 

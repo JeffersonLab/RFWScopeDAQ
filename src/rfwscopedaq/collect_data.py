@@ -45,8 +45,18 @@ class DaqThread(threading.Thread):
 		self.db_pool = db_pool
 		self.output = output
 		self.exit_event = exit_event
-		self.meta_pvs = meta_pvs
+		self.errors = []
+
+		# Construct all of the metadata PVs
+		self.meta_pvs = []
+		for pv in meta_pvs:
+			self.meta_pvs.append(epics.PV(pv))
+
 		self.cavity = Cavity(epics_name=self.epics_name, waveform_signals=self.signals)
+
+		# Wait for connections after Cavity call as these may have already connected in the background.
+		for pv in self.meta_pvs:
+			pv.wait_for_connection()
 
 		# Track samples that worked/failed
 		self.n_success = 0
@@ -118,35 +128,44 @@ class DaqThread(threading.Thread):
 												 f_metadata=float_meta, s_metadata=string_meta)
 
 							self.n_success += 1
-						except Exception as e:
+						except Exception as exc:
 							# Not sure what to do with exceptions here.  At most we want to log them.
-							traceback.print_exc()
-							pass
+							self.errors.append(exc)
 						finally:
 							# Sleep a little bit so we don't eat up CPU needlessly.
 							time.sleep(0.025)
 							current_time = datetime.now()
 				finally:
-					# Put the scope back in it's original settings.
+					# Put the scope back in its original settings.
 					self.cavity.return_scope()
 
 		except Exception as exc:
-			print(f"Errored out: {repr(exc)}")
-			traceback.print_exc()
+			self.errors.append(exc)
 
 	def get_meta_data(self) -> Tuple[Dict[str, float], Dict[str, str]]:
-		"""Query the CEBAF state via a set of PVs.  Return a """
+		"""Query the CEBAF state via a set of PVs.
+
+		Returns:
+			Dictionary of PV names to float values, dictionary of PV names to string values.
+		"""
 		if self.meta_pvs is None:
 			return {}, {}
 
-		vals = epics.caget_many(self.meta_pvs)
+		# Get the PVS, then split them into the different types.  Should be fast since the value is updated by the
+		# automonitor and the PV was connected at the start.
+		vals = {}
+		for pv in self.meta_pvs:
+			vals[pv.pvname] = pv.get()
+
 		f_metadata = {}
 		s_metadata = {}
 		for pv, val in zip(self.meta_pvs, vals):
 			if isinstance(val, float):
-				f_metadata[pv] = val
+				f_metadata[pv.pvname] = val
+			elif isinstance(val, int):
+				f_metadata[pv.pvname] = float(val)
 			else:
-				s_metadata[pv] = val
+				s_metadata[pv.pvname] = str(val)
 
 		return f_metadata, s_metadata
 
