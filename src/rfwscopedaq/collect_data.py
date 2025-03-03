@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from mysql.connector.pooling import MySQLConnectionPool
+from mysql.connector import PoolError
+from mysql.connector.pooling import MySQLConnectionPool, PooledMySQLConnection
 from rfscopedb.data_model import Scan
 
 from .cavity import Cavity
@@ -115,13 +116,9 @@ class DaqThread(threading.Thread):
 
 							float_meta, string_meta = self.get_meta_data()
 							if self.output == "db":
-								try:
-									conn = self.db_pool.get_connection()
-									self.write_to_db(start_time=start, end_time=end,
-												data_dict=results_dict, float_meta=float_meta, string_meta=string_meta,
-												conn=conn, sampling_rate=(1.0 / time_ms_stamp))
-								finally:
-									conn.close()
+								self.write_to_db(start_time=start, end_time=end,
+											data_dict=results_dict, float_meta=float_meta, string_meta=string_meta,
+											sampling_rate=(1.0 / time_ms_stamp))
 							elif self.output == "file":
 								self.write_files(results=results_dict, start_time=start, end_time=end,
 												 f_metadata=float_meta, s_metadata=string_meta)
@@ -139,6 +136,21 @@ class DaqThread(threading.Thread):
 
 		except Exception as exc:
 			self.errors.append(exc)
+
+	def get_connection_with_retry(self, max_retries=10, wait_time=0.1) -> PooledMySQLConnection:
+		"""Attempts to get a connection from the pool, waiting if necessary.
+
+		We may use a small pool so waiting might be necessary. This could be run across the entire linac and saturate
+		the database server.
+		"""
+		for attempt in range(max_retries):
+			try:
+				return self.db_pool.get_connection()  # Try to get a connection
+			except PoolError:
+				if attempt < max_retries - 1:
+					time.sleep(wait_time)
+				else:
+					raise
 
 	def get_meta_data(self) -> Tuple[Dict[str, float], Dict[str, str]]:
 		"""Query the CEBAF state via a set of PVs.
@@ -195,7 +207,7 @@ class DaqThread(threading.Thread):
 					f.write(f"# {key}\t\"{val}\"\n")
 		df.to_csv(str(tsv_file), mode='a', sep='\t', index=None, float_format="%.5e", lineterminator='\n')
 
-	def write_to_db(self, start_time, end_time, data_dict, float_meta, string_meta, conn, sampling_rate):
+	def write_to_db(self, start_time, end_time, data_dict, float_meta, string_meta, sampling_rate):
 		"""Write data to the scope waveform database
 
 		Args:
@@ -204,10 +216,16 @@ class DaqThread(threading.Thread):
 			data_dict: dictionary of waveform names to values
 			float_meta: dictionary of scan metadata, names to float value mapping
 			string_meta: dictionary of scan metadata, names to string value mapping
-			conn: database connection
 			sampling_rate: sampling rate in Hz
 		"""
 		scan = Scan(start=start_time, end=end_time)
 		scan.add_scan_data(float_data=float_meta, str_data=string_meta)
 		scan.add_cavity_data(cavity=self.epics_name, data=data_dict, sampling_rate=sampling_rate)
-		scan.insert_data(conn=conn)
+		conn = None
+		try:
+			conn = self.get_connection_with_retry()
+			scan.insert_data(conn=conn)
+		finally:
+			if conn is not None:
+				conn.close()
+
