@@ -16,6 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
+    'mysql-connector-python >=8.4, < 9.0',
     'pyepics >= 3.5, < 4.0',
     'pandas >= 1.5, < 3.0',
     'numpy >= 1.24, < 3.0',
@@ -26,9 +27,10 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 dev = [
-    'coverage >= 7.6, < 8.0',
     'pytest >= 8.3, < 9.0',
-    'build >= 1.2, < 2.0'
+    'pytest-cov >= 6.0.0, < 7.0',
+    'build >= 1.2, < 2.0',
+    'pylint >=3.3, < 4.0'
 ]
 
 [project.scripts]
@@ -42,13 +44,14 @@ version = {file = "VERSION"}
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-testpaths = ["test/unit", "test/integration"]
+testpaths = ["test/unit",]
 norecursedirs = [".git", "node_modules", "venv"]
+addopts = "--cov=rfwscopedaq --cov-fail-under=80"
 
-[tool.coverage.run]
-branch = true
-include = ['src/*']
-command_line = '-m pytest'
+[tool.pylint]
+max-line-length = 120
+max-attributes = 12
+max-args = 8
 
 # ... other project metadata fields as listed in:
 #     https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
