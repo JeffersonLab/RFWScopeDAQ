@@ -1,6 +1,7 @@
 #!/cs/dvlhome/apps/r/RFWScopeDaq/dvl/support/csueLib/bin/csueLaunch python/bin/python3.11
 # DO NOT MODIFY ABOVE LINE - it is managed automatically
 # Exception: you may change "tclsh" to "wish" or "expect"
+import copy
 import signal
 import threading
 from pathlib import Path
@@ -78,10 +79,12 @@ def process_cavities(cavities, out_dir, output: str):
     # connection does not.  Second, becuase if we used a larger pool size and launched this script once per zone, then
     # we could exhaust the number of connections on the database (often ~150).
     pool = None
-    pool_size = 1 if len(cavities) == 1 else 2
+    pool_size = 1 if len(cavities) == 1 else cfg.get_parameter(['db_config', 'pool_size'])
     if output == "db":
+        db_config = copy.deepcopy(cfg.get_parameter('db_config'))
+        del db_config['pool_size']
         pool = MySQLConnectionPool(pool_name="scope-pool", pool_size=pool_size, pool_reset_session=True,
-                                   converter_class=NumpyConverterClass, **(cfg.get_parameter('db_config')))
+                                   converter_class=NumpyConverterClass, **db_config)
 
     threads = []
     for cavity in cavities:

@@ -4,8 +4,11 @@ db_config:
   host: "localhost"
   user: "scope_rw"
   password: "password"
-  port: "3306"
+  port: 3306
   database: "scope_waveforms"
+  # Pool size is one if there is only one connection.  Otherwise, it's this value.
+  pool_size: 8
+
 
 # Waveforms to be collected.  Full PV is {epics_name}{channel}'
 signals:
