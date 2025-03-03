@@ -1,9 +1,8 @@
 import threading
 import time
-import traceback
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 
 import epics.ca
 import numpy as np
@@ -18,8 +17,8 @@ from .cavity import Cavity
 class DaqThread(threading.Thread):
 	"""A class that manages collecting and storing data for a single cavity."""
 
-	def __init__(self, exit_event: threading.Event, epics_name: str, out_dir: Path, signals: List[str], duration: int,
-				 timeout: float, db_pool: MySQLConnectionPool, output: str, meta_pvs: List[str] = None):
+	def __init__(self, exit_event: threading.Event, epics_name: str, out_dir: Path, signals: List[str], duration: float,
+				 timeout: float, db_pool: Optional[MySQLConnectionPool], output: str, meta_pvs: List[str] = None):
 		"""Create a thread that will collect and store data for a single cavity.
 
 		This job will cycle for duration minutes.  Each cycle will wait at most timeout seconds for the cavity to
@@ -129,7 +128,6 @@ class DaqThread(threading.Thread):
 
 							self.n_success += 1
 						except Exception as exc:
-							# Not sure what to do with exceptions here.  At most we want to log them.
 							self.errors.append(exc)
 						finally:
 							# Sleep a little bit so we don't eat up CPU needlessly.
@@ -195,12 +193,21 @@ class DaqThread(threading.Thread):
 			if s_metadata is not None:
 				for key, val in s_metadata.items():
 					f.write(f"# {key}\t\"{val}\"\n")
-		df.to_csv(tsv_file, mode='a', sep='\t', index=None, float_format="%.5e", lineterminator='\n')
+		df.to_csv(str(tsv_file), mode='a', sep='\t', index=None, float_format="%.5e", lineterminator='\n')
 
-	# TODO: Add end_time to rfscopedb and database
 	def write_to_db(self, start_time, end_time, data_dict, float_meta, string_meta, conn, sampling_rate):
-		"""Write data to the scope waveform database"""
-		scan = Scan(dt=start_time)
+		"""Write data to the scope waveform database
+
+		Args:
+			start_time: start time of the waveform data collection
+			end_time: end time of the waveform data collection
+			data_dict: dictionary of waveform names to values
+			float_meta: dictionary of scan metadata, names to float value mapping
+			string_meta: dictionary of scan metadata, names to string value mapping
+			conn: database connection
+			sampling_rate: sampling rate in Hz
+		"""
+		scan = Scan(start=start_time, end=end_time)
 		scan.add_scan_data(float_data=float_meta, str_data=string_meta)
 		scan.add_cavity_data(cavity=self.epics_name, data=data_dict, sampling_rate=sampling_rate)
 		scan.insert_data(conn=conn)
