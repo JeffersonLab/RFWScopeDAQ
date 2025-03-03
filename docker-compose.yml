@@ -7,7 +7,7 @@ services:
       - "25:1025"
       - "8025:8025"
   db:
-    image: jeffersonlab/rfscopedb:0.3.0
+    image: jeffersonlab/rfscopedb:1.0.0
     ports:
       - "3306:3306"
     environment:
