@@ -1,172 +1,200 @@
 # SELAP == 64, GDR == 4
 record(ai,"R$(A)CNTL2MODE") {
     field(VAL, 64)
+    field(PINI, "YES")
 }
 # RF on == 1, RF off == 0
 record(ai, "R$(A)RFONr") {
     field(VAL, 1)
+    field(PINI, "YES")
 }
 # Bit word where gradient is ramping if `int(value) & 0x0800 > 0`
 # 0x0800 == 2048
 record(ai, "R$(A)STAT1") {
     field(VAL, 0)
+    field(PINI, "YES")
 }
 # 0 == stopped, 1 == single, 2 == run, 3 == periodic
 record(ai, "R$(A)WFSCOPrun") {
     field(VAL, 3)
+    field(PINI, "YES")
 }
 # Typical periodic delay is 1, don't change to less than 0.1
 record(ai, "R$(A)WFSCOPper") {
     field(VAL, 1)
+    field(PINI, "YES")
 }
 # Sample interval within waveform data
 record(ai, "R$(A)TRGS1") {
     field(VAL, 0.2)
+    field(PINI, "YES")
 }
 # Trigger delay, probably not used here(?).  Set to 102.4 in harvester mode.
 record(ai, "R$(A)TRGD1") {
     field(VAL, 100)
+    field(PINI, "YES")
 }
 # normal == 0, debug == 1
 record(ai, "R$(A)WFSdebug1") {
     field(VAL, 0)
+    field(PINI, "YES")
 }
 # Sequencer state. 1 => 128 => 256 => 512 => 128 => ... (512 may be skipped in debug mode)
 record(ai, "R$(A)WFSCOPstp") {
     field(VAL, 1)
+    field(PINI, "YES")
 }
 # String for start time of data collection
 record(stringout, "R$(A)WFSharvTake") {
     field(VAL, "2025-01-01 00:00:00.0")
+    field(PINI, "YES")
 }
 # String  for end time of data collection
 record(stringout, "R$(A)WFSharvDa") {
     field(VAL, "2025-01-01 00:00:00.0")
+    field(PINI, "YES")
 }
 
 # Make a couple of waveforms to test with
 record(waveform, "R$(A)WFSGMES") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSPMES") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSIMES") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSQMES") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSGASK") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSPASK") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSCRFP") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSCRFPP") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSCRRP") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSCRRPP") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSGLDE") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSPLDE") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSDETA2") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSCFQE2") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 record(waveform, "R$(A)WFSDFQES") {
     field(NELM, "8192")
     field(FTVL, "FLOAT")
+    field(PINI, "YES")
 }
 
 # Metadata PVs
 record(ai, "R2XXITOT") {
-  field(VAL, 45.2)
+    field(VAL, 45.2)
+    field(PINI, "YES")
 }
 record(mbbo, "IGL1I00BEAMODE") {
-  field(DTYP, "Soft Channel")
-  field(DOL, "0")
-  field(FLNK, "0")
-  field(OUT, "0")
-  field(SDIS, "0")
-  field(COSV, "NO_ALARM")
-  field(DESC, "multibit binary output rec")
-  field(DISS, "NO_ALARM")
-  field(EISV, "NO_ALARM")
-  field(EIVL, "0")
-  field(ELSV, "NO_ALARM")
-  field(ELVL, "0")
-  field(EVNT, "0")
-  field(FFSV, "NO_ALARM")
-  field(FFVL, "0")
-  field(FRST, "USER MODE")
-  field(FRSV, "NO_ALARM")
-  field(FRVL, "4")
-  field(FTSV, "NO_ALARM")
-  field(FTVL, "0")
-  field(FVSV, "NO_ALARM")
-  field(FVVL, "0")
-  field(IVOA, "Continue normally")
-  field(IVOV, "0")
-  field(NISV, "NO_ALARM")
-  field(NIVL, "0")
-  field(NOBT, "4")
-  field(OMSL, "supervisory")
-  field(ONST, "PULSE MODE VL")
-  field(ONSV, "NO_ALARM")
-  field(ONVL, "1")
-  field(PHAS, "0")
-  field(PINI, "YES")
-  field(PRIO, "LOW")
-  field(SCAN, "Passive")
-  field(SIML, "0")
-  field(SIMS, "NO_ALARM")
-  field(SIOL, "0")
-  field(SVSV, "NO_ALARM")
-  field(SVVL, "0")
-  field(SXSV, "NO_ALARM")
-  field(SXVL, "0")
-  field(TESV, "NO_ALARM")
-  field(TEVL, "0")
-  field(THST, "CW MODE (DC)")
-  field(THSV, "NO_ALARM")
-  field(THVL, "3")
-  field(TTSV, "NO_ALARM")
-  field(TTVL, "0")
-  field(TVSV, "NO_ALARM")
-  field(TVVL, "0")
-  field(TWST, "TUNE MODE")
-  field(TWSV, "NO_ALARM")
-  field(TWVL, "2")
-  field(UNSV, "NO_ALARM")
-  field(ZRST, "BEAM SYNC ONLY")
-  field(ZRSV, "NO_ALARM")
-  field(ZRVL, "0")
+    field(DTYP, "Soft Channel")
+    field(DOL, "0")
+    field(FLNK, "0")
+    field(OUT, "0")
+    field(SDIS, "0")
+    field(COSV, "NO_ALARM")
+    field(DESC, "multibit binary output rec")
+    field(DISS, "NO_ALARM")
+    field(EISV, "NO_ALARM")
+    field(EIVL, "0")
+    field(ELSV, "NO_ALARM")
+    field(ELVL, "0")
+    field(EVNT, "0")
+    field(FFSV, "NO_ALARM")
+    field(FFVL, "0")
+    field(FRST, "USER MODE")
+    field(FRSV, "NO_ALARM")
+    field(FRVL, "4")
+    field(FTSV, "NO_ALARM")
+    field(FTVL, "0")
+    field(FVSV, "NO_ALARM")
+    field(FVVL, "0")
+    field(IVOA, "Continue normally")
+    field(IVOV, "0")
+    field(NISV, "NO_ALARM")
+    field(NIVL, "0")
+    field(NOBT, "4")
+    field(OMSL, "supervisory")
+    field(ONST, "PULSE MODE VL")
+    field(ONSV, "NO_ALARM")
+    field(ONVL, "1")
+    field(PHAS, "0")
+    field(PINI, "YES")
+    field(PRIO, "LOW")
+    field(SCAN, "Passive")
+    field(SIML, "0")
+    field(SIMS, "NO_ALARM")
+    field(SIOL, "0")
+    field(SVSV, "NO_ALARM")
+    field(SVVL, "0")
+    field(SXSV, "NO_ALARM")
+    field(SXVL, "0")
+    field(TESV, "NO_ALARM")
+    field(TEVL, "0")
+    field(THST, "CW MODE (DC)")
+    field(THSV, "NO_ALARM")
+    field(THVL, "3")
+    field(TTSV, "NO_ALARM")
+    field(TTVL, "0")
+    field(TVSV, "NO_ALARM")
+    field(TVVL, "0")
+    field(TWST, "TUNE MODE")
+    field(TWSV, "NO_ALARM")
+    field(TWVL, "2")
+    field(UNSV, "NO_ALARM")
+    field(ZRST, "BEAM SYNC ONLY")
+    field(ZRSV, "NO_ALARM")
+    field(ZRVL, "0")
+    field(PINI, "YES")
 }
