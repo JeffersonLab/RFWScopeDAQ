@@ -19,14 +19,17 @@ set_to_periodic() {
 }
 
 update_waveforms () {
-  val=$(date +%s | rev | cut -c1)
+  val="$(date +%s | rev | cut -c1) $(seq 2 8192)"
   waveforms="IMES QMES GMES PMES GASK PASK CRFP CRFPP CRRP CRRPP GLDE PLDE DETA2 CFQE2 DFQES"
   for cav in $cavs
   do
-    values="$val $(seq 2 8192)"
     for wf in $waveforms
     do
-      caput -a "${cav}WFS${wf}" 8192 $values > /dev/null
+      # We just need the process timestamps to match the sequencer change timestamps.
+      # This is pretty fast without setting the whole waveform and hitting them all in the background at once.  Added
+      # 5ms sleep to keep from overwhelming the soft IOC
+      caput -a ${cav}WFS${wf} 1 $val > /dev/null &
+      sleep 0.005
     done
   done
 }
@@ -69,9 +72,8 @@ do
     update_sequencer 256
     set_start_time
     sleep 0.1
-    # Takes several seconds.  No extra delay needed.
+    # Takes a few seconds.  No extra delay needed.
     update_waveforms
-    # sleep 1.6
     i=2
   else
     update_sequencer 512
