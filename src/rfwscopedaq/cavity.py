@@ -1,3 +1,4 @@
+"""Module for managing all Cavity activities"""
 import time
 from contextlib import contextmanager
 import threading
@@ -10,7 +11,9 @@ import numpy as np
 
 from . import app_config as cfg
 
+# pylint: disable=too-many-instance-attributes
 class Cavity:
+    """A class for interacting with RF Cavities.  In particular all EPICS interactions should be handled here."""
 
     def _data_ready_cb(self, value=None, timestamp=None, **kwargs):
         """This callback should only be used to monitor the R...STAT2b.B3 PV to see when the FCC has updated data.
@@ -58,27 +61,25 @@ class Cavity:
         self.pv_conn_lock = threading.Lock()
         self.pvs = []
 
-        # Cavity status PVs
-        # self.rf_on = epics.PV(f"{epics_name}RFONr", connection_callback=self._connection_cb)  # Is the cavity RF on
-        self.rf_on = epics.PV(f"{epics_name}RFONr")  # Is the cavity RF on
+        # Is the cavity RF on
+        self.rf_on = epics.PV(f"{epics_name}RFONr")
         self.pvs.append(self.rf_on)
-        # self.stat1 = epics.PV(f"{epics_name}STAT1", connection_callback=self._connection_cb)  # Is the cavity currently ramping gradient
-        self.stat1 = epics.PV(f"{epics_name}STAT1")  # Is the cavity currently ramping gradient
+        # Is the cavity currently ramping gradient
+        self.stat1 = epics.PV(f"{epics_name}STAT1")
+        # Is the cavity currently ramping gradient
         self.pvs.append(self.stat1)
-        # self.cntl2mode = epics.PV(f"{epics_name}CNTL2MODE", connection_callback=self._connection_cb)  # The RF control mode. 4 or 64 == stable operations)
-        self.cntl2mode = epics.PV(f"{epics_name}CNTL2MODE")  # The RF control mode. 4 or 64 == stable operations)
+        # The RF control mode. 4 or 64 == stable operations)
+        self.cntl2mode = epics.PV(f"{epics_name}CNTL2MODE")
         self.pvs.append(self.cntl2mode)
 
         # Data PVs
         self.waveform_pvs = {}
         for signal in waveform_signals:
-            # self.waveform_pvs[epics_name+"WF"+signal] = epics.PV(epics_name+"WF"+signal, auto_monitor=False, connection_callback=self._connection_cb)
             self.waveform_pvs[epics_name + signal] = epics.PV(epics_name + signal, auto_monitor=False)
             self.pvs.append(self.waveform_pvs[epics_name + signal])
 
         # Control the waveform mode.  Not sure why we have two separate PVs, but this is the API.
         # -1 = User requested stop, 0 = Is Stopped, 1 = single, 2 = run, 3 = periodic, others also exist.
-        # self.scope_setting = epics.PV(f"{epics_name}WFSCOPrun", connection_callback=self._connection_cb)  
         self.scope_setting = epics.PV(f"{epics_name}WFSCOPrun")
         self.pvs.append(self.scope_setting)
 
@@ -112,24 +113,23 @@ class Cavity:
         self.trigger_delay = epics.PV(f"{epics_name}TRGD1")
         self.pvs.append(self.trigger_delay)
 
-        # New Firmware has new sequencer state PV - the states that matter are these values. 
+        # New Firmware has new sequencer state PV - the states that matter are these values.
         # Waveforms are ready upon entering 512.
         # 1   -  1. Button (initial state)
         # 128 -  8. Run 3 Setup & Timing
         # 256 -  9. Run 3 Read WFs
         # 512 - 10. Run 3 Calc
-        # self.scope_seq_step = epics.PV(f"{epics_name}WFSCOPstp", form='time', callback=self._data_ready_cb, connection_callback=self._connection_cb)
         self.scope_seq_step = epics.PV(f"{epics_name}WFSCOPstp", form='time', callback=self._data_ready_cb)
         self.pvs.append(self.scope_seq_step)
         # self.scope_reached_read_step = False  # Is the sequencer currently at or past the read step (2048) this cycle.
 
         # New firmware includes string PVs that track the time the fpga was reading data
         # self.fpga_start_PV = epics.PV(f"{epics_name}WFSharvTake", connection_callback=self._connection_cb)
-        self.fpga_start_PV = epics.PV(f"{epics_name}WFSharvTake")
-        self.pvs.append(self.fpga_start_PV)
+        self.fpga_start_pv = epics.PV(f"{epics_name}WFSharvTake")
+        self.pvs.append(self.fpga_start_pv)
         # self.fpga_end_PV = epics.PV(f"{epics_name}WFSharvDa", connection_callback=self._connection_cb)
-        self.fpga_end_PV = epics.PV(f"{epics_name}WFSharvDa")
-        self.pvs.append(self.fpga_end_PV)
+        self.fpga_end_pv = epics.PV(f"{epics_name}WFSharvDa")
+        self.pvs.append(self.fpga_end_pv)
 
         # The data_ready flag will be updated from callbacks and work thread.  Indicates that the data set is ready to
         # harvest.
@@ -153,7 +153,7 @@ class Cavity:
         with self.pv_conn_lock:
             for pv in self.pvs:
                 # Make sure we don't set to false if the connection CB has already run.
-                if pv.pvname not in self.pv_conns.keys():
+                if pv.pvname not in self.pv_conns:
                     self.pv_conns[pv.pvname] = False
 
         # Wait for things to connect.  If the IOC isn't available at the start, raise an exception for the worker thread
@@ -172,8 +172,8 @@ class Cavity:
     def get_fpga_times(self):
         """Read the timestamps for when the FPGA started and stopped collecting data."""
         fmt = "%Y-%m-%d %H:%M:%S.%f"
-        self.fpga_start = datetime.strptime(self.__get_pv(self.fpga_start_PV), fmt)
-        self.fpga_end = datetime.strptime(self.__get_pv(self.fpga_end_PV), fmt)
+        self.fpga_start = datetime.strptime(self.__get_pv(self.fpga_start_pv), fmt)
+        self.fpga_end = datetime.strptime(self.__get_pv(self.fpga_end_pv), fmt)
 
     def is_gradient_ramping(self):
         """Check if the cavity is currently ramping gradient."""
@@ -195,7 +195,7 @@ class Cavity:
     def is_valid_control_mode(self):
         """Check that the cavity is in a valid control mode for this measurement."""
         value = self.__get_pv(self.cntl2mode)
-        valid = value == 4 or value == 64
+        valid = value in (4, 64)
         return valid
 
     def is_beam_current_sufficient(self):
@@ -204,6 +204,7 @@ class Cavity:
         return beam_current > cfg.get_parameter("min_beam_current")
 
     def is_state_valid(self):
+        """Check that the cavity is in a valid state for collecting data."""
         not_ramping = not self.is_gradient_ramping()
         rf_on = self.is_rf_on()
         valid_mode = self.is_valid_control_mode()
@@ -228,14 +229,14 @@ class Cavity:
                     self.get_fpga_times()
                     self.data_ready = False
 
-                    # Get the waveforms           
+                    # Get the waveforms
                     wf_values = {}
                     fpga_start = self.fpga_start
                     fpga_end = self.fpga_end
 
                     start = datetime.now()
                     for wf in self.waveform_pvs.values():
-                        wf_values[wf.pvname] = (self.__get_pv(wf, use_monitor=False))
+                        wf_values[wf.pvname] = self.__get_pv(wf, use_monitor=False)
 
                     # Warn if total download time was too long.
                     duration = (datetime.now() - start).total_seconds()
@@ -392,7 +393,8 @@ class Cavity:
                 # We need to turn the scope mode off.  Apply our settings.  Turn it to periodic.  Unroll those changes
                 # when done.
                 self.scope_setting.put(-1, wait=True)
-                # Particularly in development environment, this can take a long time to recover back to 0 after being reset.
+                # Particularly in development environment, this can take a long time to recover back to 0 after being
+                # reset.
                 self.__wait_for_pv(self.scope_setting, 0, timeout=10)
 
                 self.sample_interval.put(sample_interval)
@@ -413,7 +415,7 @@ class Cavity:
 
         finally:
             # When that context exits, we put it back in the old mode.
-            # Setting changes should only happen when scope is in off mode.            
+            # Setting changes should only happen when scope is in off mode.
             self.scope_setting.put(-1, wait=True)
             self.__wait_for_pv(self.scope_setting, 0, timeout=10)
 

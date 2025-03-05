@@ -1,6 +1,4 @@
-#!/cs/dvlhome/apps/r/RFWScopeDaq/dvl/support/csueLib/bin/csueLaunch python/bin/python3.11
-# DO NOT MODIFY ABOVE LINE - it is managed automatically
-# Exception: you may change "tclsh" to "wish" or "expect"
+"""A module for managing the entry point to the application"""
 import copy
 import signal
 import threading
@@ -18,11 +16,6 @@ from .collect_data import DaqThread
 from . import app_config as cfg
 from . import __version__
 from .email_sender import EmailSender
-
-# Get application paths
-csue_app_path = cfg.csue_app_path
-csue_log_dir = cfg.csue_log_dir
-csue_cfg_dir = cfg.csue_config_dir
 
 
 # SET NP TO PRINT OUT ENTIRE WAVEFORM ARRAY
@@ -52,8 +45,11 @@ class NumpyConverterClass(MySQLConverter):
         return int(value)
 
 
+# unsure of all the arguments that will be passed when a signal is received, but we don't use any
+# pylint: disable=unused-argument
 def handler(*args, **kwargs):
     """Signal handler that notifies any threads watching the EXIT_EVENT that it's time to exit."""
+    # pylint: disable=global-variable-not-assigned
     global EXIT_EVENT
     EXIT_EVENT.set()
 
@@ -127,9 +123,8 @@ def send_failure_report(threads: List[DaqThread]):
             max_fail_percent = 1.0
             break
 
-        percent = 1.0 - float(thread.n_success) / thread.n_attempts
-        if percent > max_fail_percent:
-            max_fail_percent = percent
+        # Calculate the current failure percentage and compare against current max.
+        max_fail_percent = max(max_fail_percent, 1.0 - float(thread.n_success) / thread.n_attempts)
 
     if max_fail_percent >= cfg.get_parameter('failure_threshold'):
         mailer = EmailSender(subject="RFWScopeDAQ Failure Report", toaddrs=cfg.get_parameter(['email', 'to_addrs']),
@@ -156,7 +151,7 @@ def validate_cavity(cavity: str):
     valid_zones = "23456789ABCDEFGHIJKLMNOPQ"
     valid_cavities = "12345678"
 
-    if not re.match("R\d\w\d$", cavity):
+    if not re.match(r"R\d\w\d$", cavity):
         raise ValueError("Invalid cavity name.  Use EPICSName format ('R1M1').")
     if cavity[1] not in valid_linacs:
         raise ValueError("Invalid linac number.  Only use 0=Inj, 1=NL, or 2=SL.")
@@ -183,7 +178,7 @@ def validate_zone(zone: str):
     valid_linacs = "012"
     valid_zones = "23456789ABCDEFGHIJKLMNOPQ"
 
-    if not re.match("R\d\w$", zone):
+    if not re.match(r"R\d\w$", zone):
         raise ValueError("Invalid zone name.  Use EPICSName format ('R1M')")
     if zone[1] not in valid_linacs:
         raise ValueError("Invalid linac number.  Only use 0=Inj, 1=NL, or 2=SL")
@@ -196,10 +191,11 @@ def validate_zone(zone: str):
 
 
 def main():
+    """This should be used as the entry point for the application."""
     try:
         # Setup parser.  You can target either a cavity or a zone.  Secondary check is
         # required to make sure that the user hasn't blocked all output of results.
-        parser = argparse.ArgumentParser(prog=f"waveform_cavity",
+        parser = argparse.ArgumentParser(prog="RFWScopeDAQ",
                                          description="Collect waveform data to teach AI model.  Most settings are in "
                                                      "cfg.json")
         group = parser.add_mutually_exclusive_group(required=True)
@@ -220,7 +216,7 @@ def main():
         parser.add_argument("-E", "--no-email", action='store_true',
                             help="Suppress generation of the email report")
         parser.add_argument("-f", "--file", type=str,
-                            default=f"{Path(csue_cfg_dir).joinpath('config.yaml')}", help="Configuration file")
+                            default=f"{Path(cfg.CSUE_CONFIG_DIR).joinpath('config.yaml')}", help="Configuration file")
         parser.add_argument("-v", "--version", action='version', version='%(prog)s ' + __version__)
 
         args = parser.parse_args()
@@ -261,5 +257,7 @@ def main():
         # Go get the data and analyze it
         process_cavities(cavities=cavities, out_dir=out_dir, output=args.output)
 
+    # I want to give a friendly error message for any likely errors and not a massive stack trace.
+    # pylint: disable=broad-exception-caught
     except Exception as e:
         print("Error:", e)

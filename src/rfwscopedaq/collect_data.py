@@ -1,14 +1,14 @@
+"""A class for managing data collection tasks"""
 import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
+import warnings
 
 import epics.ca
 import numpy as np
 import pandas as pd
-import warnings
-
 from mysql.connector import PoolError
 from mysql.connector.pooling import MySQLConnectionPool, PooledMySQLConnection
 from rfscopedb.data_model import Scan
@@ -16,11 +16,14 @@ from rfscopedb.data_model import Scan
 from .cavity import Cavity
 
 
+# pylint: disable=too-many-instance-attributes
 class DaqThread(threading.Thread):
     """A class that manages collecting and storing data for a single cavity."""
 
-    def __init__(self, exit_event: threading.Event, epics_name: str, out_dir: Path, signals: List[str], duration: float,
-                 timeout: float, db_pool: Optional[MySQLConnectionPool], output: str, meta_pvs: List[str] = None):
+    # pylint: disable=too-many-arguments
+    def __init__(self, *, exit_event: threading.Event, epics_name: str, out_dir: Path, signals: List[str],
+                 duration: float, timeout: float, db_pool: Optional[MySQLConnectionPool], output: str,
+                 meta_pvs: List[str] = None):
         """Create a thread that will collect and store data for a single cavity.
 
         This job will cycle for duration minutes.  Each cycle will wait at most timeout seconds for the cavity to
@@ -119,12 +122,15 @@ class DaqThread(threading.Thread):
                             if self.output == "db":
                                 self.write_to_db(start_time=start, end_time=end,
                                                  data_dict=results_dict, float_meta=float_meta, string_meta=string_meta,
-                                                 sampling_rate=(1.0 / time_ms_stamp))
+                                                 sampling_rate=1.0 / time_ms_stamp)
                             elif self.output == "file":
                                 self.write_files(results=results_dict, start_time=start, end_time=end,
                                                  f_metadata=float_meta, s_metadata=string_meta)
 
                             self.n_success += 1
+                        # Broad exception since any problem needs to be swallowed and collection retried within the
+                        # thread.
+                        # pylint: disable=broad-exception-caught
                         except Exception as exc:
                             self.errors.append(exc)
                         finally:
@@ -135,6 +141,9 @@ class DaqThread(threading.Thread):
                     # Put the scope back in its original settings.
                     self.cavity.return_scope()
 
+        # Failure report should be emailed if we experienced many errors or no attempts were made (this case is the
+        # likely one here).
+        # pylint: disable=broad-exception-caught
         except Exception as exc:
             self.errors.append(exc)
 
@@ -144,14 +153,20 @@ class DaqThread(threading.Thread):
         We may use a small pool so waiting might be necessary. This could be run across the entire linac and saturate
         the database server.
         """
+
+        conn = None
+        if max_retries <= 0:
+            raise ValueError("Must try at least once to get the connection.")
+
         for attempt in range(max_retries):
             try:
-                return self.db_pool.get_connection()  # Try to get a connection
+                conn = self.db_pool.get_connection()  # Try to get a connection
             except PoolError:
                 if attempt < max_retries - 1:
                     time.sleep(wait_time)
                 else:
                     raise
+        return conn
 
     def get_meta_data(self) -> Tuple[Dict[str, float], Dict[str, str]]:
         """Query the CEBAF state via a set of PVs.
@@ -180,26 +195,18 @@ class DaqThread(threading.Thread):
 
         return f_metadata, s_metadata
 
-    def write_files(self, results: Dict[str, np.ndarray], start_time: datetime, end_time: datetime,
+    def write_files(self, *, results: Dict[str, np.ndarray], start_time: datetime, end_time: datetime,
                     f_metadata: Dict[str, float], s_metadata: Dict[str, str]):
         """Write data to standardized TSV file."""
-        cav = self.epics_name[0:4]
-        cavity_dir = self.out_dir.joinpath(cav)
-        time_ms_stamp = self.cavity.sample_interval.get()
+        tsv_file, cavity_dir = self.get_cavity_filepath(start_time=start_time, end_time=end_time)
+        cavity_dir.mkdir(parents=True, exist_ok=True)
 
         # Convert the data to a more friendly format and generate a timestamp column
         df = pd.DataFrame(results).astype(float)
-        wf_len = df.shape[0]
-        df.insert(0, 'Time', np.array([time_ms_stamp * i for i in range(wf_len)]))
+        df.insert(0, 'Time', self.generate_time_column(wf_length=df.shape[0]))
         df['Time'] = df['Time'].astype(str)
 
-        s_str = start_time.strftime("%Y_%m_%d_%H-%M-%S-%f")
-        e_str = end_time.strftime("%Y_%m_%d_%H-%M-%S-%f")
-
-        tsv_file = cavity_dir.joinpath(f"{cav}WFS_{s_str}_{e_str}.tsv")
-        cavity_dir.mkdir(parents=True, exist_ok=True)
-
-        with open(tsv_file, 'w') as f:
+        with open(tsv_file, 'w', encoding="utf-8") as f:
             if f_metadata is not None:
                 for key, val in f_metadata.items():
                     f.write(f"# {key}\t{val}\n")
@@ -208,7 +215,32 @@ class DaqThread(threading.Thread):
                     f.write(f"# {key}\t\"{val}\"\n")
         df.to_csv(str(tsv_file), mode='a', sep='\t', index=None, float_format="%.5e", lineterminator='\n')
 
-    def write_to_db(self, start_time, end_time, data_dict, float_meta, string_meta, sampling_rate):
+    def generate_time_column(self, wf_length: int):
+        """Generate a list for the time column in data files.  [0, ..., (wf_length-1) * sample_interval]
+
+        Args:
+            wf_length: Length of the time column.
+        """
+        # pandas seems to specify an ndarray as acceptable, but not list
+        return np.array([self.cavity.sample_interval.get() * i for i in range(wf_length)])
+
+    def get_cavity_filepath(self, start_time: datetime, end_time: datetime) -> Path:
+        """Generate the full path to the cavity file.
+
+        Args:
+            start_time: Start time of the scan
+            end_time: End time of the scan
+        """
+        cav = self.epics_name[0:4]
+        cavity_dir = self.out_dir.joinpath(cav)
+
+        s_str = start_time.strftime("%Y_%m_%d_%H-%M-%S-%f")
+        e_str = end_time.strftime("%Y_%m_%d_%H-%M-%S-%f")
+        tsv_file = cavity_dir.joinpath(f"{cav}WFS_{s_str}_{e_str}.tsv")
+
+        return tsv_file
+
+    def write_to_db(self, *, start_time, end_time, data_dict, float_meta, string_meta, sampling_rate):
         """Write data to the scope waveform database
 
         Args:

@@ -1,11 +1,12 @@
-import yaml
+"""A module for managing application configuration in a thread-safe manner."""
 import threading
 import os
 import logging
 from typing import Any, List, Union
-
 from functools import reduce
 import operator
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,9 @@ app_root = os.environ.get('APP_ROOT')
 
 # CSUE variables - challenging to use these if not using CSUE templates.
 # Instead, use a relative path to identify the root directory for this version.
-csue_app_path = app_root
-csue_log_dir = f"{csue_app_path}/fileio/log"
-csue_config_dir = f"{csue_app_path}/fileio/config"
+CSUE_APP_PATH = app_root
+CSUE_LOG_DIR = f"{CSUE_APP_PATH}/fileio/log"
+CSUE_CONFIG_DIR = f"{CSUE_APP_PATH}/fileio/config"
 
 # The configuration dictionary for the application
 _CONFIG = {}
@@ -45,10 +46,11 @@ def parse_config_file(filename: str = f"{app_root}/cfg.yaml"):
     Args:
         filename:  The name of the file parse
     """
+    # pylint: disable=global-variable-not-assigned
     global _CONFIG, _CONFIG_LOCK
     with _CONFIG_LOCK:
         try:
-            with open(filename, mode="r") as f:
+            with open(filename, mode="r", encoding="utf-8") as f:
                 _CONFIG = yaml.safe_load(f)
 
         except yaml.YAMLError as exc:
@@ -56,18 +58,19 @@ def parse_config_file(filename: str = f"{app_root}/cfg.yaml"):
             if hasattr(exc, 'problem_mark'):
                 line = exc.problem_mark.line + 1
                 column = exc.problem_mark.column
-                logger.error(f"Error parsing {filename} near line {line} column {column}")
+                logger.error("Error parsing %s near line %s column %s", filename, line, column)
             else:
-                logger.error(f"Error parsing config: {exc}")
+                logger.error("Error parsing config: %s", exc)
             raise
 
         except Exception as exc:
-            logger.error(f"Error reading file '{filename}': {exc}")
+            logger.error("Error reading file %s': %s", filename, exc)
             raise exc
 
 
 def clear_config():
     """Clear the configuration"""
+    # pylint: disable=global-variable-not-assigned
     global _CONFIG, _CONFIG_LOCK
     with _CONFIG_LOCK:
         _CONFIG = {}
@@ -85,9 +88,10 @@ def set_parameter(key: Union[str, List[str]], value: Any):
             key = "db_config" would query _CONFIG["db_config"].
         value:  The value to set.  Can be any object.
     """
+    # pylint: disable=global-variable-not-assigned
     global _CONFIG, _CONFIG_LOCK
     with _CONFIG_LOCK:
-        if type(key) == str:
+        if isinstance(key, str):
             _CONFIG[key] = value
         elif len(key) == 1:
             _CONFIG[key[0]] = value
@@ -103,6 +107,7 @@ def get_parameter(key: Union[str, List[str], None]) -> Any:
             parameter.  Example key = ["db_config", "user"] would query _CONFIG["db_config"]["user"], while
             key = "db_config" would query _CONFIG["db_config"].
     """
+    # pylint: disable=global-variable-not-assigned
     global _CONFIG_LOCK
     with _CONFIG_LOCK:
         return _get_parameter(key)
@@ -110,12 +115,13 @@ def get_parameter(key: Union[str, List[str], None]) -> Any:
 
 def _get_parameter(key: Union[str, List[str], None]) -> Any:
     """Set an individual config parameter.  If key is None, return entire dictionary.  Not thread safe, internal use."""
+    # pylint: disable=global-variable-not-assigned
     global _CONFIG, _CONFIG_LOCK
     out = None
     try:
         if key is None:
             out = _CONFIG
-        elif type(key) == str:
+        elif isinstance(key, str):
             out = _CONFIG[key]
         else:
             out = _get_from_dict(_CONFIG, key)
@@ -128,6 +134,7 @@ def _get_parameter(key: Union[str, List[str], None]) -> Any:
 
 def validate_config():
     """Make sure that a handful of required _CONFIG settings are present and of correct type."""
+    # pylint: disable=global-variable-not-assigned
     global _CONFIG, _CONFIG_LOCK
     required = [
         ('timeout', float),
@@ -148,8 +155,8 @@ def validate_config():
                 raise ValueError(f"Configuration is missing '{key}")
             # Check that all of these are floats / numbers
             if not isinstance(_CONFIG[key], typ):
-                logger.error(f"Required config parameter '{key}' is not required type '{typ}'."
-                             f"  Received '{_CONFIG[key]}' of type '{type(_CONFIG[key])}'")
-                logger.error(f"_CONFIG = {_CONFIG}")
+                logger.error("Required config parameter '%s' is not required type '%s'."
+                             "  Received '%s' of type '%s'", key, typ, _CONFIG[key], type(_CONFIG[key]))
+                logger.error("_CONFIG = %s", _CONFIG)
                 raise ValueError(f"Required config parameter '{key}' is not required type '{typ}'."
                                  f"  Received '{_CONFIG[key]}' of type '{type(_CONFIG[key])}'")
