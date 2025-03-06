@@ -75,7 +75,7 @@ Useful CLI tests are:
 
 
 ### Documentation
-Basic documentation is provided in the docs folder.
+User guide documentation is provided in the CSUE installation.
 
 ### Release
 Releases are generated automatically when the VERSION file recieves a commit on the main branch.  Artifcats (packages) are not deployed to PyPI automatically as this is intended as a limited use application.  Build artifacts are automatically attached to the releases when generated along with the python dependency information for the build (requirements.txt).
