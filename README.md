@@ -16,24 +16,24 @@ appropriate launcher script.
 git clone https://github.com/JeffersonLab/RFWScopeDAQ
 cd RFWScopeDAQ
 python3.11 -m venv venv
-. venv/bin/activate
+source venv/bin/activate
 pip install .[dev]
 bin/RFWScopeDAQ.bash -h
 ```
 
 **Windows:**
-```bash
+```powershell
 git clone https://github.com/JeffersonLab/RFWScopeDAQ
 cd RFWScopeDAQ
 python3.11 -m venv venv
-. venv/bin/activate
+venv\Scripts\activate.ps1
 pip install .[dev]
 bin\RFWScopeDAQ.ps1 -h
 ```
 
  ## Developer Quick Start Guide
 Download the repo, create a virtual environment using pythong 3.11+, and install the package in editable mode with 
-development dependencies.  Then develop using your preferred IDE, etc..  This is very similar to the above, except that 
+development dependencies.  Then develop using your preferred IDE, etc.  This is very similar to the above, except that 
 the package is installed in editable mode.
 
 *Linux*
@@ -82,3 +82,4 @@ Releases are generated automatically when the VERSION file recieves a commit on 
 
 ## See Also
 - [rfscopedb-container](https://github.com/JeffersonLab/rfscopedb-container)
+- [rfscopedb](https://github.com/JeffersonLab/rfscopedb)
