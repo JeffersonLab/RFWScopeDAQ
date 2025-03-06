@@ -55,3 +55,10 @@ failure_threshold: 0.0
 
 # Minimum amount of beam current in microamps required for data to be collected.
 min_beam_current: 1.0
+
+# Minimum amount of free storage required in gigabytes for data collection to run
+min_free_space: 50.0
+
+# Location of the database storage on disk.  Checked if writing to the database is requested.
+#db_data_partition: "/data2/mariadb"
+db_data_partition: "/"

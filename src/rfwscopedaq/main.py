@@ -3,10 +3,11 @@ import copy
 import signal
 import threading
 from pathlib import Path
+import shutil
 import argparse
 from datetime import datetime
 import re
-from typing import List
+from typing import List, Tuple
 
 from mysql.connector.conversion import MySQLConverter
 from mysql.connector.pooling import MySQLConnectionPool
@@ -16,7 +17,6 @@ from .collect_data import DaqThread
 from . import app_config as cfg
 from . import __version__
 from .email_sender import EmailSender
-
 
 # SET NP TO PRINT OUT ENTIRE WAVEFORM ARRAY
 # np.set_printoptions(threshold=sys.maxsize)
@@ -28,6 +28,7 @@ EXIT_EVENT = threading.Event()
 
 class NumpyConverterClass(MySQLConverter):
     """Class for converting numpy numeric types to those supported by mysql-connector-python."""
+
     @staticmethod
     def _float32_to_mysql(value):
         return float(value)
@@ -69,7 +70,6 @@ def process_cavities(cavities, out_dir, output: str):
     # Define handlers for common 'exit now' signals
     signal.signal(signal.SIGINT, handler)
     signal.signal(signal.SIGTERM, handler)
-
 
     # Use a pool with a small number of connections.  First because the pool handles thready safety where a single
     # connection does not.  Second, becuase if we used a larger pool size and launched this script once per zone, then
@@ -139,7 +139,6 @@ def send_failure_report(threads: List[DaqThread]):
         mailer.send_txt_email(msg)
 
 
-
 def validate_cavity(cavity: str):
     """Check if the cavity name is valid.  Raise exception if not.
 
@@ -190,6 +189,69 @@ def validate_zone(zone: str):
         raise ValueError(f"Invalid zone.  Options for that linac are {valid_zones}")
 
 
+def check_and_alert_free_storage(check_dir):
+    """Check that we have sufficient storage to take more data.
+
+    Args:
+        check_dir: Directory to check for free storage
+    """
+    free_gb = shutil.disk_usage(check_dir).free / (1024 ** 3)
+    if free_gb < cfg.get_parameter("min_free_space"):
+        msg = f"Error: insufficient free space in {check_dir}.  {free_gb} GB < {cfg.get_parameter('min_free_space')}" \
+              " GB."
+        # Only print a message if no email is configured
+        if (cfg.get_parameter("email") is None) or (len(cfg.get_parameter(['email', 'to_addrs'])) == 0):
+            print(msg)
+        else:
+            sender = EmailSender(subject="RFWScopeDAQ: Insufficient free space",
+                                 fromaddr=cfg.get_parameter(["email", 'from_addr']),
+                                 toaddrs=cfg.get_parameter(["email", 'to_addrs']), )
+            sender.send_txt_email(msg)
+        return 1
+    return 0
+
+
+def process_args_and_cfg(args: argparse.Namespace) -> Tuple[List[str], Path]:
+    """Process command line args and config file.  Update cfg as necessary.
+    Args:
+        args: Command line arguments
+    """
+    # Default value is set in app_config
+    cfg.parse_config_file(args.file)
+
+    # Update configuration
+    if args.duration:
+        cfg.set_parameter("duration", args.duration)
+    if args.email is not None:
+        cfg.set_parameter(["email", "to_addrs"], args.email)
+    if args.no_email:
+        cfg.set_parameter("email", None)
+    if args.dir:
+        cfg.set_parameter('base_dir', args.dir)
+
+    base_dir = Path(cfg.get_parameter("base_dir"))
+    app_start = datetime.now().strftime("%Y_%m_%d")
+    cavities = []
+    if args.cavity is not None:
+        out_dir = base_dir.joinpath(app_start, args.cavity[:-1])
+        cavities.append(args.cavity)
+    elif args.zone is not None:
+        validate_zone(args.zone)
+        out_dir = base_dir.joinpath(app_start, args.zone)
+        for i in range(1, 9):
+            cavities.append(f"{args.zone}{i}")
+    else:
+        raise ValueError("Cavity or Zone must be supplied to CLI.")
+
+    for cavity in cavities:
+        validate_cavity(cavity)
+
+    # Make sure that we have all the configuration we need fully setup
+    cfg.validate_config()
+
+    return cavities, out_dir
+
+
 def main():
     """This should be used as the entry point for the application."""
     try:
@@ -219,45 +281,27 @@ def main():
                             default=f"{Path(cfg.CSUE_CONFIG_DIR).joinpath('config.yaml')}", help="Configuration file")
         parser.add_argument("-v", "--version", action='version', version='%(prog)s ' + __version__)
 
+        # Process CLI arguments and config file
         args = parser.parse_args()
+        cavities, out_dir = process_args_and_cfg(args)
 
-        # Default value is set in app_config
-        cfg.parse_config_file(args.file)
-
-        # Update configuration
-        if args.duration:
-            cfg.set_parameter("duration", args.duration)
-        if args.email is not None:
-            cfg.set_parameter(["email", "to_addrs"], args.email)
-        if args.no_email:
-            cfg.set_parameter("email", None)
-        if args.dir:
-            cfg.set_parameter('base_dir', args.dir)
-
-        base_dir = Path(cfg.get_parameter("base_dir"))
-        app_start = datetime.now().strftime("%Y_%m_%d")
-        cavities = []
-        if args.cavity is not None:
-            out_dir = base_dir.joinpath(app_start, args.cavity[:-1])
-            cavities.append(args.cavity)
-        elif args.zone is not None:
-            validate_zone(args.zone)
-            out_dir = base_dir.joinpath(app_start, args.zone)
-            for i in range(1, 9):
-                cavities.append(f"{args.zone}{i}")
+        # Check that we have sufficient free storage.  Exit if not.
+        if args.output == "db":
+            check_dir = cfg.get_parameter("db_data_partition")
+        elif args.output == "file":
+            check_dir = cfg.get_parameter('base_dir')
         else:
-            raise ValueError("Cavity or Zone must be supplied to CLI.")
+            raise ValueError(f"Unsupported output {args.output}")
+        if check_and_alert_free_storage(check_dir):
+            return 1
 
-        for cavity in cavities:
-            validate_cavity(cavity)
-
-        # Make sure that we have all the configuration we need fully setup
-        cfg.validate_config()
-
-        # Go get the data and analyze it
+        # Go get the data
         process_cavities(cavities=cavities, out_dir=out_dir, output=args.output)
 
     # I want to give a friendly error message for any likely errors and not a massive stack trace.
     # pylint: disable=broad-exception-caught
     except Exception as e:
         print("Error:", e)
+        return 1
+
+    return 0
