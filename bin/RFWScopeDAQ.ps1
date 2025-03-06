@@ -5,4 +5,8 @@ $Env:APP_ROOT = "$root_dir"
 
 & "venv\Scripts\activate.ps1"
 
-Start-Process -Wait -NoNewWindow -FilePath RFWScopeDAQ -ArgumentList "$($args -join ' ')"
+if ($args.Count -eq 0) {
+    Start-Process -Wait -NoNewWindow -FilePath RFWScopeDAQ -ArgumentList '-h'
+} else {
+    Start-Process -Wait -NoNewWindow -FilePath RFWScopeDAQ -ArgumentList "$($args -join ' ')"
+}
