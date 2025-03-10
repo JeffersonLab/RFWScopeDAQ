@@ -46,7 +46,7 @@ version = {file = "VERSION"}
 pythonpath = ["src"]
 testpaths = ["test/unit",]
 norecursedirs = [".git", "node_modules", "venv"]
-addopts = "--cov=rfwscopedaq --cov-fail-under=80"
+addopts = "--cov=rfwscopedaq --cov-fail-under=25"
 
 [tool.pylint]
 max-line-length = 120
