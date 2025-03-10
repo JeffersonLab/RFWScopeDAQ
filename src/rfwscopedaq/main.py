@@ -278,7 +278,7 @@ def main():
         parser.add_argument("-E", "--no-email", action='store_true',
                             help="Suppress generation of the email report")
         parser.add_argument("-f", "--file", type=str,
-                            default=f"{Path(cfg.CSUE_CONFIG_DIR).joinpath('config.yaml')}", help="Configuration file")
+                            default=f"{Path(cfg.CSUE_CONFIG_DIR).joinpath('cfg.yaml')}", help="Configuration file")
         parser.add_argument("-v", "--version", action='version', version='%(prog)s ' + __version__)
 
         # Process CLI arguments and config file
