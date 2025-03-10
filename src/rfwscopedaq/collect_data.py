@@ -238,7 +238,7 @@ class DaqThread(threading.Thread):
         e_str = end_time.strftime("%Y_%m_%d_%H-%M-%S-%f")
         tsv_file = cavity_dir.joinpath(f"{cav}WFS_{s_str}_{e_str}.tsv")
 
-        return tsv_file
+        return tsv_file, cavity_dir
 
     def write_to_db(self, *, start_time, end_time, data_dict, float_meta, string_meta, sampling_rate):
         """Write data to the scope waveform database
