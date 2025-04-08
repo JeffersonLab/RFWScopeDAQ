@@ -22,19 +22,19 @@ class Cavity:
         the PV was processed.
         """
 
-        with self.data_ready_lock:
-            # Start of data taking phase for the FPGA and other pauses
-            if value == 128:
-                # FPGA has finished reading data.  Now time to transfer to IOC.  Waveform records will be in
-                # an inconsistent state until the step is done.
-                self.first_time = True
-            elif value == 256 and self.first_time:
-                self.data_ready = False
-                self.window_start = timestamp
-            # We've read all the waveforms into EPICS records and are calculating statistics.
-            elif value == 512 and self.first_time:
-                self.window_end = timestamp
-                self.data_ready = True
+        if value == 1:
+            pass
+        elif value == 128:
+            self.first_time = True
+        else:
+            with self.data_ready_lock:
+                if value == 256 and self.first_time:
+                    self.data_ready = False
+                    self.window_start = timestamp
+                # We've read all the waveforms into EPICS records and are calculating statistics.
+                elif value == 512 and self.first_time:
+                    self.window_end = timestamp
+                    self.data_ready = True
 
     def _connection_cb(self, pvname=None, conn=None):
         """Callback used to track connection status for cavity PVs in a single data structure."""
@@ -212,42 +212,47 @@ class Cavity:
 
         return all((not_ramping, rf_on, valid_mode, sufficient_beam))
 
-    def get_waveforms(self, timeout=60, sleep_dur=0.01) -> Tuple[Dict[str, np.ndarray], datetime, datetime]:
+    def get_waveforms(self, timeout=60, sleep_dur=0.05) -> Tuple[Dict[str, np.ndarray], datetime, datetime]:
         """Waits for the FCC to have reported data is ready, then grabs those waveforms.  Checks for valid timestamps"""
         count = 0
         while True:
             # Check that the sequencer-related PV is still connected since that is what drives this whole process.
             if not self.scope_seq_step.connected:
-                print("lost connection to scope")
                 raise RuntimeError(f"{self.epics_name}: Scope sequencer PV ({self.scope_seq_step.pvname}) "
                                    f"disconnected.")
 
-            # Wait for to be ready, but timeout eventually
+            get_data = False
+            # Wait for data to be ready, but timeout eventually.
+            # Don't hold this lock too long.  CA from this thread won't complete while a callback is in active
             with self.data_ready_lock:
                 # Check if the FCC has gathered all the data we need.  Get it if so.
                 if self.data_ready:
                     self.get_fpga_times()
+                    # Set this to False so the next loop doesn't grab it again until the callback has found that a new
+                    # set of data is ready to download.
                     self.data_ready = False
+                    get_data = True
 
-                    # Get the waveforms
-                    wf_values = {}
-                    fpga_start = self.fpga_start
-                    fpga_end = self.fpga_end
+            # Get the waveforms
+            if get_data:
+                wf_values = {}
+                fpga_start = self.fpga_start
+                fpga_end = self.fpga_end
 
-                    start = datetime.now()
-                    for wf in self.waveform_pvs.values():
-                        wf_values[wf.pvname] = self.__get_pv(wf, use_monitor=False)
-
+                start = datetime.now()
+                for wf in self.waveform_pvs.values():
+                    wf_values[wf.pvname] = self.__get_pv(wf, use_monitor=False)
                     # Warn if total download time was too long.
                     duration = (datetime.now() - start).total_seconds()
                     if duration > 1.5:
                         print(f"{self.epics_name}: Warning.  Waveform downloads took {duration} seconds")
 
-                    # Make sure that they look like a synchronous grouping.  These should throw if not.
-                    for wf in self.waveform_pvs.values():
-                        self.__pv_in_window(wf)
+                # Make sure that they look like a synchronous grouping.  These should throw if not.
+                for wf in self.waveform_pvs.values():
+                    self.__pv_in_window(wf)
 
-                    break
+                # Exit the loop so we can return the good data.
+                break
 
             # Sleep for a little bit before we check again if data is ready.  pend_event more precides than time.sleep
             epics.ca.pend_event(sleep_dur)
