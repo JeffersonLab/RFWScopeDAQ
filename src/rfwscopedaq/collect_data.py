@@ -161,6 +161,7 @@ class DaqThread(threading.Thread):
         for attempt in range(max_retries):
             try:
                 conn = self.db_pool.get_connection()  # Try to get a connection
+                break
             except PoolError:
                 if attempt < max_retries - 1:
                     time.sleep(wait_time)
