@@ -22,12 +22,11 @@ class DaqThread(threading.Thread):
 
     # pylint: disable=too-many-arguments
     def __init__(self, *, exit_event: threading.Event, epics_name: str, out_dir: Path, signals: List[str],
-                 duration: float, timeout: float, db_pool: Optional[MySQLConnectionPool], output: str,
+                 duration: float, db_pool: Optional[MySQLConnectionPool], output: str,
                  meta_pvs: List[str] = None):
         """Create a thread that will collect and store data for a single cavity.
 
-        This job will cycle for duration minutes.  Each cycle will wait at most timeout seconds for the cavity to
-        achieve stable operations before starting a new cycle.
+        This job will cycle for duration minutes.  
 
         Args:
             epics_name: The EPICSName of the cavity to collect data for
@@ -35,7 +34,6 @@ class DaqThread(threading.Thread):
             signals: The name of the signals to collect data for. ("GMES", "PMES", etc.).  The exact PV name for the
               signals will be automatically constructed later.
             duration: How long in minutes to collect data for this cavity.
-            timeout: How long to wait for this cavity to finish.
             db_pool: The connection pool for the waveform database.
             output: 'db': Write to database.  'file': Write to file
         """
@@ -45,7 +43,6 @@ class DaqThread(threading.Thread):
         self.out_dir = out_dir
         self.signals = signals
         self.duration = duration
-        self.timeout = timeout
         self.db_pool = db_pool
         self.output = output
         self.exit_event = exit_event
@@ -67,10 +64,7 @@ class DaqThread(threading.Thread):
         self.n_attempts = 0
 
     def run(self):
-        """Collect and store data for a single cavity.
-
-        This job will cycle for self.duration minutes.  Each cycle will wait at most timeout seconds for the cavity to
-        achieve stable operations before starting a new cycle.
+        """Collect and store data for a single cavity.  This job will cycle for self.duration minutes.  
         """
 
         try:
@@ -105,11 +99,13 @@ class DaqThread(threading.Thread):
 
                             # Wait until CEBAF and cavity is in a stable state.  Break if time
                             start = datetime.now()
+                            skip_loop = False
                             while not self.cavity.is_state_valid():
                                 time.sleep(0.05)
-                                if (datetime.now() - start).total_seconds() > self.timeout:
-                                    raise RuntimeError(f"{self.epics_name}: {start.strftime('%Y-%m-%d %H:%M:%S')} "
-                                                       "sample timed out waiting for stable running")
+                                if datetime.now() > stop_time:
+                                    skip_loop = True
+                            if skip_loop:
+                                continue
 
                             # Here goes the actual data collection
                             self.n_attempts += 1

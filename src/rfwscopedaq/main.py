@@ -86,8 +86,7 @@ def process_cavities(cavities, out_dir, output: str):
     for cavity in cavities:
         threads.append(DaqThread(exit_event=EXIT_EVENT, epics_name=cavity, duration=cfg.get_parameter('duration'),
                                  out_dir=out_dir, signals=cfg.get_parameter('signals'),
-                                 timeout=cfg.get_parameter('timeout'), db_pool=pool, output=output,
-                                 meta_pvs=cfg.get_parameter('meta_pvs')))
+                                 db_pool=pool, output=output, meta_pvs=cfg.get_parameter('meta_pvs')))
 
     # Kick off the threads
     for thread in threads:
