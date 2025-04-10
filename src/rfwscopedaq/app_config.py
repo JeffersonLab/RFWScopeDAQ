@@ -137,12 +137,10 @@ def validate_config():
     # pylint: disable=global-variable-not-assigned
     global _CONFIG, _CONFIG_LOCK
     required = [
-        ('timeout', float),
         ('signals', list),
         ('meta_pvs', list),
         ('base_dir', str),
         ('email', dict),
-        ('timeout', float),
         ('failure_threshold', float),
         ('db_config', dict),
         ('min_beam_current', float)
