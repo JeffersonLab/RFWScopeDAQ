@@ -97,13 +97,13 @@ class DaqThread(threading.Thread):
                             # Recheck the scope is in the desired mode before every download.  Useful for long runs.
                             self.cavity.setup_scope()
 
-                            # Wait until CEBAF and cavity is in a stable state.  Break if time
-                            start = datetime.now()
+                            # Wait until CEBAF and cavity is in a stable state or it is time to stop collecting.
                             skip_loop = False
                             while not self.cavity.is_state_valid():
                                 time.sleep(0.05)
-                                if datetime.now() > stop_time:
+                                if (datetime.now() > stop_time) or self.exit_event.is_set():
                                     skip_loop = True
+                                    break
                             if skip_loop:
                                 continue
 
