@@ -1,4 +1,5 @@
-
+CVS/
+.cvsignore
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -59,7 +59,7 @@ class TestDAQThread(TestCase):
             with patch("rfwscopedaq.collect_data.Cavity",
                        new=lambda *args, **kwargs: MockCavity(0.2, *args, **kwargs)):
                 thread = DaqThread(exit_event=Event(), epics_name=epics_name, out_dir=dir_path,
-                                   signals=["GMES", "PMES"], duration=5.0, timeout=1.0, db_pool=None, output="file",
+                                   signals=["GMES", "PMES"], duration=5.0, db_pool=None, output="file",
                                    meta_pvs=[])
 
                 thread.write_files(results=result_dict, start_time=start_time, end_time=end_time, f_metadata=f_metadata,
