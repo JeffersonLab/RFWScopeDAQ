@@ -248,12 +248,6 @@ class DaqThread(threading.Thread):
             string_meta: dictionary of scan metadata, names to string value mapping
             sampling_rate: sampling rate in Hz
         """
-        print("FLOAT")
-        print(float_meta)
-        print()
-        print()
-        print("STRING")
-        print(string_meta)
         scan = Scan(start=start_time, end=end_time)
         scan.add_scan_data(float_data=float_meta, str_data=string_meta)
         scan.add_cavity_data(cavity=self.epics_name, data=data_dict, sampling_rate=sampling_rate)
