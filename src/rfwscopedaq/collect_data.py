@@ -176,17 +176,17 @@ class DaqThread(threading.Thread):
 
         # Get the PVS, then split them into the different types.  Should be fast since the value is updated by the
         # automonitor and the PV was connected at the start.
-        vals = {}
-        for pv in self.meta_pvs:
-            vals[pv.pvname] = pv.get()
-
         f_metadata = {}
         s_metadata = {}
-        for pv, val in zip(self.meta_pvs, vals):
+        for pv in self.meta_pvs:
+            val = pv.get()
             if isinstance(val, float):
                 f_metadata[pv.pvname] = val
             elif isinstance(val, int):
                 f_metadata[pv.pvname] = float(val)
+            elif val is None:
+                # Most PVs we watch are floats.  Without more knowledge about the PV type, pick the most likely type.
+                f_metadata[pv.pvname] = None
             else:
                 s_metadata[pv.pvname] = str(val)
 
@@ -248,6 +248,12 @@ class DaqThread(threading.Thread):
             string_meta: dictionary of scan metadata, names to string value mapping
             sampling_rate: sampling rate in Hz
         """
+        print("FLOAT")
+        print(float_meta)
+        print()
+        print()
+        print("STRING")
+        print(string_meta)
         scan = Scan(start=start_time, end=end_time)
         scan.add_scan_data(float_data=float_meta, str_data=string_meta)
         scan.add_cavity_data(cavity=self.epics_name, data=data_dict, sampling_rate=sampling_rate)
